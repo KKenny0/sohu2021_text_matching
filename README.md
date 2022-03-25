@@ -1,27 +1,42 @@
-## 2021 搜狐校园文本匹配算法大赛方案
-我们是初赛 Top9、复赛 Top15 的队伍 **BERloomers**，来自广西师范大学。
-成员：KennyWu (kennywu96@163.com)、null_li (lizx3845@163.com)。
-此次开源的方案是赛后重新设计的，线下验证集 F1 约为 0.7887。
-根据复赛提交时线下验证集和线上测试集的误差，预估该开源方案的线上测试集 F1 约为 0.787 左右。
-欢迎大家的交流与指正。
+English · [简体中文](./README_zh.md) 
+
+---
+
+## 2021 Sohu Campus Text Matching Algorithm Competition Program
+
+> [Official Website](https://www.biendata.xyz/competition/sohu_2021/)
+
+We are the team **BERloomers**, ranked *9th* in the preliminary round and *15th* in the rematch.
+
+Members: KennyWu (kennywu96@163.com), null_li (lizx3845@163.com).
+
+This open source solution was redesigned after the competition, and the offline validation set F1 is about 0.7887.
+
+We welcome your comments and corrections.
+
 ![](figure/sohu2021.png)
 
-## 1. 方案分享
+## 1. Scheme
 
-### 1.1 任务目标
-参赛选手需要正确判断两段文字是否匹配，<a href="https://www.biendata.xyz/competition/sohu_2021/data/">数据</a>分为 A 和 B 两个文件，A 和 B 文件匹配标准不一样。其中 A 和 B 文件又分为“短短文本匹配”、“短长文本匹配”和“长长文本匹配”。
-A 文件匹配标准较为宽泛，两段文字是同一个话题便视为匹配，B 文件匹配标准较为严格，两段文字须是同一个事件才视为匹配。
+### 1.1 Task
+The contestants need to correctly determine whether two texts match or not.
 
-### 1.2 数据示例
+<a href="https://www.biendata.xyz/competition/sohu_2021/data/">The data</a> is divided into two files, A and B, which have different matching criteria.
+The A and B files are divided into **short text matching**, **short and long text matching** and **long and long text matching**.
+
+The A file has a broader matching criterion, where two paragraphs are considered to be a match if they are on the same topic, 
+while the B file has a stricter matching criterion, where two paragraphs are considered to be a match only if they are on the same event.
+
+### 1.2 Data example
 ```python
-# A 类 短短 样本示例
+# A short-short sample
 {
     "source": "小艺的故事让爱回家2021年2月16日大年初五19：30带上你最亲爱的人与团团君相约《小艺的故事》直播间！",
     "target": "  香港代购了不起啊，宋点卷竟然在直播间“炫富”起来",
     "labelA": "0"
 }
 
-# B 类 短短 样本示例
+# B short-short sample
 {
     "source": "让很多网友好奇的是，张柏芝在一小时后也在社交平台发文：“给大家拜年啦。”还有网友猜测：谢霆锋的经纪人发文，张柏芝也发文，并且配图，似乎都在证实，谢霆锋依旧和王菲在一起，而张柏芝也有了新的恋人，并且生了孩子，两人也找到了各自的归宿，有了自己的幸福生活，让传言不攻自破。",
     "target": "  陈晓东谈旧爱张柏芝，一个口误暴露她的秘密，难怪谢霆锋会离开她", 
@@ -29,60 +44,79 @@ A 文件匹配标准较为宽泛，两段文字是同一个话题便视为匹配
 }
 ```
 
-### 1.3 解题思路
-为了从数据中学习到尽可能多的信息，同时又兼顾 A、B 以及三种小分类标准，我们的方案基于多任务学习的框架，共享一部分参数来进行表示学习，再设计任务特定的分类器来进行标签预测。
+### 1.3 Scheme design
+In order to learn as much information as possible from the data while also taking into account standards A, B, 
+and the three minor classification criteria, 
+our plan is based on a multi-task learning framework, 
+sharing some parameters for representation learning, 
+and then designing task-specific classifiers for label prediction.
 
-#### 1.3.1 模型设计
-框架设计基于 BERT 的交互模型，通过 BERT 来得到 source-target pair 的向量表示。
-本方案的整体结构如下图所示：
+#### 1.3.1 Model
+The framework is designed based on BERT for an interactive model, using BERT to obtain vector representations of source-target pairs. 
+The overall structure of this plan is shown in the figure below:
 ![overall architecture](figure/model.png)
 
-#### 1.3.2 文本编码
-在本方案中使用最后 3 层的结果来进行下游任务的学习。
-此外，针对此次比赛可划分为 6 个子任务的特点，我们引入了 Special Tokens 的概念。
-- 提出了 6 种 Type Token 来引导文本的表示学习：
-    | Token | 任务类型   |
-    | --- | ------------|
-    | SSA | 短短匹配 A 类 |
-    | SSB | 短短匹配 B 类 |
-    | SLA | 短长匹配 A 类 |
-    | SLA | 短长匹配 A 类 |
-    | LLA | 长长匹配 A 类 |
-    | LLB | 长长匹配 A 类 |
+#### 1.3.2 Encoding
+In this plan, the results from the last 3 layers are used for learning downstream tasks.
+Moreover, considering the characteristic of this competition being divided into 6 sub-tasks, we introduce the concept of Special Tokens.
+- Six Type Tokens are proposed to guide the representation learning of text:
 
-- 使用`[<S>]、[</S>]`和`[<T>]、[</T>]`来分别区分 source 和 target。
+    | Token | Task type     |
+    | --- |---------------|
+    | SSA | short-short A |
+    | SSB | short-short B |
+    | SLA | short-long A  |
+    | SLB | short-long B  |
+    | LLA | long-long A   |
+    | LLB | long-long B   |
 
-#### 1.3.3 多任务学习
-为了更好地学习`Type Token`的表示，并辅助`Task-Attentive Classifier`的学习，我们提出了数据类型标签预测任务，即根据`Type Token`的表示来判断当前输入属于哪种任务类型。
+- Use `[<S>]` and `[</S>]` to distinguish the source, and `[<T>]` and `[</T>]` to distinguish the target. (The corresponding special tokens have been added to the vocab.txt file under models/*.)
 
-#### 1.3.4Task-Attentive Classifier
-本着“和而不同”的思想，A、B 两个任务各独立使用一个的`Task-Attentive Classifier`，同时将 Type Token 的表示作为额外的条件信息传入`Classifier`进行 attention 计算，以获得 type-specific 的特征进行标签预测。
+#### 1.3.3 Multi-task learning
+In order to better learn the representation of `Type Token` and to assist in the learning of `Task-Attentive Classifier`, 
+we have proposed a data type label prediction task, 
+which is to determine the type of task the current input belongs to based on the representation of `Type Token`.
+
+#### 1.3.4 Task-Attentive Classifier
+Adhering to the philosophy of "harmony in diversity," 
+tasks A and B each independently employ a `Task-Attentive Classifier`. 
+Meanwhile, the representation of Type Token is passed as additional conditional information into the `Classifier` for attention computation, 
+thereby obtaining type-specific features for label prediction.
+
 ![task attentive classifier](figure/task_attentive.png)
 
-### 1.4 竞赛技巧
+### 1.4 Competitive tricks
 
-#### 1.4.1 数据划分
-本方案中所使用的训练数据囊括『复赛所提供的训练集和初赛所提供的所有数据』，使用复赛提供的验证集来 evalute 模型的效果。
+#### 1.4.1 Data segmentation
+The training data used in this plan includes both the training set provided for the semifinals and all the data provided in the preliminary round. 
+The validation set provided for the semifinals is used to evaluate the performance of the model.
+
+#### 1.4.2 Model fusion
+Based on the F1 scores of three models on the offline validation set, 
+different weights were assigned, 
+and the optimal weight combination was found through **automatic search** to achieve the best performance offline. 
+In this solution, the `WoBERT` model used comes from the customized PyTorch-based pre-trained model loading framework created by member KennyWu, 
+<a href="https://github.com/KKenny0/torchKbert">torchKbert</a>, 
+and we express our gratitude to Zhuiyi Technology for their open-sourced <a href="https://github.com/ZhuiyiTechnology/WoBERT">WoBERT</a>.
+
+| 模型               |                     链接                     |
+|:-----------------|:------------------------------------------:|
+| BERT-wwm-ext     | https://github.com/ymcui/Chinese-BERT-wwm  |
+| RoBERTa-wwm-ext  | https://github.com/ymcui/Chinese-BERT-wwm  |
+| WoBERT           | https://github.com/ZhuiyiTechnology/WoBERT |
 
 
-#### 1.4.2 模型融合
-根据三个模型在线下验证集上的 F1 值设置了不同权重，同时通过**自动搜索**找到了最优的权重组合，得到线下。
-本方案中所使用的`WoBERT`来自成员 KennyWu (本人) 客制的基于 pytorch 的预训练模型加载框架 <a href="https://github.com/KKenny0/torchKbert">torchKbert</a>，在此感谢追一科技开源的 <a href="https://github.com/ZhuiyiTechnology/WoBERT">WoBERT</a>。
-| 模型               | 链接                       | 
-| ------------------ | -------------------------- |
-| BERT-wwm-ext       | https://github.com/ymcui/Chinese-BERT-wwm  |
-| RoBERTa-wwm-ext | https://github.com/ymcui/Chinese-BERT-wwm   |
-| WoBERT                | https://github.com/ZhuiyiTechnology/WoBERT |
+#### 1.4.3 Adversarial training、EMA和 Focal Loss
 
-#### 1.4.3 对抗训练、指数移动平均（EMA）和 Focal Loss
-
-### 1.5 相比于复赛所提交方案的改进之处
-本次开源的方案从**数据划分**、**模型结构**和**模型融合**三个方面对复赛提交方案进行改进。
-- **数据划分**：扩大训练集，复赛提供的训练集-->复赛提供的训练集+初赛的所有数据。
-- **模型结构**：重新设计了网络结构，改善了`Task-specific encoding`的方式。
-- **模型融合**：复赛所提交方案使用`BERT-wwm-ext`和`ERNIE-1.0`进行模型融合。此方案则使用`BERT-wwm-ext`、`RoBERTa-wwm-ext`和`WoBERT`进行融合。
+### 1.5 Improvements compared to the proposal submitted in the competition
+The open-source solution for this round has been improved over the previous submission in three aspects: **data segmentation**, **model architecture**, and **model ensemble**.
+- **Data segmentation**：Expand the training set: the training set provided for the second round --> the training set provided for the second round + all the data from the preliminary round.
+- **Model architecture**：The network structure has been redesigned to improve the method of Task-specific encoding.
+- **Model fusion**：The plan submitted for the second round of the competition used the fusion of `BERT-wwm-ext` and `ERNIE-1.0` models. This plan, however, employs the fusion of `BERT-wwm-ext`, `RoBERTa-wwm-ext`, and `WoBERT`.
 
 ## 2. 复赛反思
-复赛准备过程略显匆忙，最终复赛提交的方案存在许多不足。
-因此在赛后我们将整个过程进行了复盘，并对方案进行了改进。
-尽管复赛未能进 Top10，这次的比赛于我们而言仍是一次很好的经验。
+The preparation for the semi-final was somewhat hasty, 
+and the plan we submitted for the semi-final had many shortcomings. 
+Therefore, after the competition, we reviewed the entire process and improved the plan. 
+Although we did not make it into the Top 10 in the semi-final, 
+this competition was still a valuable experience for us.
